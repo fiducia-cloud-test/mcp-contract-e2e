@@ -95,9 +95,11 @@ jobs:
       - name: Download Gleam dependencies
         working-directory: shutdown-contract/gleam
         run: gleam deps download
-      - name: Format
+      - name: Show canonical Gleam formatting diff
         working-directory: shutdown-contract/gleam
-        run: gleam format --check src test
+        run: |
+          gleam format src test
+          git diff --exit-code -- src test
       - name: Test Gleam transition table
         working-directory: shutdown-contract/gleam
         run: gleam test
