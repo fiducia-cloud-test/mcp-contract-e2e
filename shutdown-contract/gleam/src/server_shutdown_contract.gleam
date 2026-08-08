@@ -27,27 +27,15 @@ pub type Action {
 }
 
 pub type State {
-  State(
-    phase: Phase,
-    stdin_is_tty: Bool,
-    first_trigger: FirstTrigger,
-  )
+  State(phase: Phase, stdin_is_tty: Bool, first_trigger: FirstTrigger)
 }
 
 pub type Transition {
-  Transition(
-    state: State,
-    action: Action,
-    show_force_hint: Bool,
-  )
+  Transition(state: State, action: Action, show_force_hint: Bool)
 }
 
 pub fn initial(stdin_is_tty: Bool) -> State {
-  State(
-    phase: Running,
-    stdin_is_tty: stdin_is_tty,
-    first_trigger: NoTrigger,
-  )
+  State(phase: Running, stdin_is_tty: stdin_is_tty, first_trigger: NoTrigger)
 }
 
 pub fn apply(state: State, trigger: Trigger) -> Transition {
