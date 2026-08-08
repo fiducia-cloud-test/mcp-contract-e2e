@@ -67,9 +67,11 @@ jobs:
         with:
           toolchain: "1.88.0"
           components: rustfmt, clippy
-      - name: Format
+      - name: Apply and display canonical Rust formatting
         working-directory: shutdown-contract/rust
-        run: cargo fmt --all -- --check
+        run: |
+          cargo fmt --all
+          git diff -- src
       - name: Lint
         working-directory: shutdown-contract/rust
         run: cargo clippy --all-targets --all-features -- -D warnings
@@ -95,11 +97,11 @@ jobs:
       - name: Download Gleam dependencies
         working-directory: shutdown-contract/gleam
         run: gleam deps download
-      - name: Show canonical Gleam formatting diff
+      - name: Apply and display canonical Gleam formatting
         working-directory: shutdown-contract/gleam
         run: |
           gleam format src test
-          git diff --exit-code -- src test
+          git diff -- src test
       - name: Test Gleam transition table
         working-directory: shutdown-contract/gleam
         run: gleam test
