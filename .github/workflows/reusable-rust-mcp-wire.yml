@@ -3,6 +3,10 @@ name: reusable Rust MCP wire contract
 on:
   workflow_call:
     inputs:
+      harness-ref:
+        description: Full 40-character commit SHA used by both the caller's uses reference and the harness checkout
+        required: true
+        type: string
       binary:
         description: Cargo binary name to build and execute
         required: true
@@ -57,23 +61,44 @@ jobs:
       - name: Build exact locked caller binary
         env:
           BINARY: ${{ inputs.binary }}
-          MANIFEST_PATH: ${{ inputs.manifest-path }}
+          MANIFEST_PATH: ${{ inputs['manifest-path'] }}
         run: cargo build --locked --manifest-path "$MANIFEST_PATH" --bin "$BINARY"
-      - name: Check out the exact reusable-workflow revision
+      - name: Validate immutable harness revision
+        env:
+          HARNESS_REF: ${{ inputs['harness-ref'] }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$HARNESS_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'harness-ref must be exactly 40 lowercase hexadecimal characters' >&2
+            exit 1
+          fi
+      - name: Check out the explicit harness revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: fiducia-cloud-test/mcp-contract-e2e
-          ref: ${{ github.workflow_sha }}
+          ref: ${{ inputs['harness-ref'] }}
           path: .mcp-contract-e2e
           persist-credentials: false
           show-progress: false
+      - name: Verify checked-out harness identity
+        env:
+          HARNESS_REF: ${{ inputs['harness-ref'] }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git -C .mcp-contract-e2e rev-parse HEAD)"
+          if [[ "$actual" != "$HARNESS_REF" ]]; then
+            echo "harness identity drifted: $actual != $HARNESS_REF" >&2
+            exit 1
+          fi
       - name: Exercise real stdio MCP lifecycle
         env:
           BINARY: ${{ inputs.binary }}
-          BINARY_PATH: ${{ inputs.binary-path }}
-          REQUIRED_TOOLS: ${{ inputs.required-tools }}
-          CALL_TOOL: ${{ inputs.call-tool }}
-          CHILD_ENV_JSON: ${{ inputs.child-env-json }}
+          BINARY_PATH: ${{ inputs['binary-path'] }}
+          REQUIRED_TOOLS: ${{ inputs['required-tools'] }}
+          CALL_TOOL: ${{ inputs['call-tool'] }}
+          CHILD_ENV_JSON: ${{ inputs['child-env-json'] }}
         shell: bash
         run: |
           set -euo pipefail
