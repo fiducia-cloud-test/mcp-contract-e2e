@@ -25,7 +25,7 @@ function validate(overrides = {}) {
 
 test('accepts aligned README, source-pins, test-plan, and remote main', () => {
   const evidence = validate();
-  assert.equal(evidence.sourceSha, '44e2909466c1444c637222f5d8a90b9c4daa6a70');
+  assert.equal(evidence.sourceSha, remoteHead);
   assert.equal(evidence.readmeSha, evidence.sourcePinsSha);
   assert.equal(evidence.sourcePinsSha, evidence.testPlanSha);
 });
