@@ -18,7 +18,7 @@ Source organization: `fiducia-cloud`
 
 | Source | Commit | Branch observed |
 |---|---:|---|
-| `fiducia-cloud/fiducia-mcp-server.rs` | `44e2909466c1444c637222f5d8a90b9c4daa6a70` | `main` |
+| `fiducia-cloud/fiducia-mcp-server.rs` | `1b3ba4e9ffdda9e7913407834280ebcbf045048d` | `main` |
 
 ## Dependency lanes
 
