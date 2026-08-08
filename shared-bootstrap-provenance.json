@@ -4,7 +4,7 @@
   "source": {
     "repository": "fiducia-cloud/fiducia-mcp-server.rs",
     "branch": "main",
-    "commitSha": "430ed9c69eae0fd2b446aa8564f45cc17d59069b"
+    "commitSha": "1b3ba4e9ffdda9e7913407834280ebcbf045048d"
   },
   "sharedBootstrap": {
     "repository": "ORESoftware/mcp-rust-libs",
@@ -13,7 +13,7 @@
   "files": {
     "Cargo.toml": {
       "fixture": "fixtures/Cargo.toml",
-      "blobSha": "cb020d9511aa422e1736e772bc07e643ce2ba830"
+      "blobSha": "16f31cd278a85187daed61d32cda79f46ea4a630"
     },
     "src/telemetry.rs": {
       "fixture": "fixtures/src/telemetry.rs",
