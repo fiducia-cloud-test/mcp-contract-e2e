@@ -1,0 +1,108 @@
+name: polyglot server shutdown contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/shutdown-contract.yml"
+      - "shutdown-contract/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/shutdown-contract.yml"
+      - "shutdown-contract/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: Node.js state and runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          show-progress: false
+          submodules: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+      - run: node --test shutdown-contract/node/shutdown.test.mjs
+
+  go:
+    name: Go state and net/http runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          show-progress: false
+          submodules: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: "1.23.x"
+          cache-dependency-path: shutdown-contract/go/go.mod
+      - name: Race-test graceful and forceful net/http shutdown
+        working-directory: shutdown-contract/go
+        run: go test -race ./...
+
+  rust:
+    name: Rust state and Axum/Tokio runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          show-progress: false
+          submodules: false
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: "1.88.0"
+          components: rustfmt, clippy
+      - name: Format
+        working-directory: shutdown-contract/rust
+        run: cargo fmt --all -- --check
+      - name: Lint
+        working-directory: shutdown-contract/rust
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Test
+        working-directory: shutdown-contract/rust
+        run: cargo test --all-targets --all-features
+
+  gleam-and-beam-launcher:
+    name: Gleam state and BEAM terminal launcher
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          show-progress: false
+          submodules: false
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          otp-version: "26.0.2"
+          gleam-version: "0.33.0"
+          rebar3-version: "3"
+      - name: Download Gleam dependencies
+        working-directory: shutdown-contract/gleam
+        run: gleam deps download
+      - name: Format
+        working-directory: shutdown-contract/gleam
+        run: gleam format --check src test
+      - name: Test Gleam transition table
+        working-directory: shutdown-contract/gleam
+        run: gleam test
+      - name: Test TTY double-SIGINT, Ctrl-D, and non-TTY SIGTERM behavior
+        working-directory: shutdown-contract/gleam
+        run: |
+          bash -n bin/graceful-beam-launcher
+          python3 bin/test-graceful-beam-launcher.py
