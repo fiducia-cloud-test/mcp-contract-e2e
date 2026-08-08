@@ -92,7 +92,7 @@ jobs:
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
         with:
           otp-version: "26.0.2"
-          gleam-version: "0.33.0"
+          gleam-version: "1.14.0"
           rebar3-version: "3"
       - name: Download Gleam dependencies
         working-directory: shutdown-contract/gleam
