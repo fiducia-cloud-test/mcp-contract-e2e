@@ -1,0 +1,90 @@
+name: reusable Rust MCP wire contract
+
+on:
+  workflow_call:
+    inputs:
+      binary:
+        description: Cargo binary name to build and execute
+        required: true
+        type: string
+      binary-path:
+        description: Executable path after build
+        required: false
+        default: ''
+        type: string
+      manifest-path:
+        description: Cargo manifest path
+        required: false
+        default: Cargo.toml
+        type: string
+      toolchain:
+        description: Rust toolchain used by the caller repository
+        required: false
+        default: 1.97.1
+        type: string
+      required-tools:
+        description: Comma-separated required MCP tool names
+        required: true
+        type: string
+      call-tool:
+        description: Optional zero-argument tool to invoke after discovery
+        required: false
+        default: safety_contract
+        type: string
+      child-env-json:
+        description: Non-secret JSON object passed only to the child process
+        required: false
+        default: '{}'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  wire-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out caller repository without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          show-progress: false
+      - name: Install caller Rust toolchain
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+        with:
+          toolchain: ${{ inputs.toolchain }}
+      - name: Build exact locked caller binary
+        env:
+          BINARY: ${{ inputs.binary }}
+          MANIFEST_PATH: ${{ inputs.manifest-path }}
+        run: cargo build --locked --manifest-path "$MANIFEST_PATH" --bin "$BINARY"
+      - name: Check out the exact reusable-workflow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: fiducia-cloud-test/mcp-contract-e2e
+          ref: ${{ github.workflow_sha }}
+          path: .mcp-contract-e2e
+          persist-credentials: false
+          show-progress: false
+      - name: Exercise real stdio MCP lifecycle
+        env:
+          BINARY: ${{ inputs.binary }}
+          BINARY_PATH: ${{ inputs.binary-path }}
+          REQUIRED_TOOLS: ${{ inputs.required-tools }}
+          CALL_TOOL: ${{ inputs.call-tool }}
+          CHILD_ENV_JSON: ${{ inputs.child-env-json }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          executable="${BINARY_PATH:-target/debug/$BINARY}"
+          args=(
+            --command "$executable"
+            --required-tools "$REQUIRED_TOOLS"
+            --child-env-json "$CHILD_ENV_JSON"
+            --timeout-ms 15000
+          )
+          if [[ -n "$CALL_TOOL" ]]; then
+            args+=(--call-tool "$CALL_TOOL")
+          fi
+          node .mcp-contract-e2e/scripts/mcp-wire-contract.mjs "${args[@]}"
