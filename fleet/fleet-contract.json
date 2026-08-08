@@ -56,34 +56,39 @@
     {
       "repository": "messaging-intel/msgint-mcp-server.rs",
       "pullRequest": 9,
-      "state": "open-draft",
-      "headSha": "496dda201787f7bee5a0dd863841692b2ae4c9d8",
-      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "bounded-subprocess"]
+      "state": "merged",
+      "headSha": "396c50f79448e45d31c3507f96a60a6eb7eedd42",
+      "mergeSha": "9d6f2acef7711b2065148e6a6daccc31674cfe56",
+      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "bounded-subprocess", "runner-admission-exception"],
+      "evidenceNote": "Merged after source review under an explicit runner-admission exception; this entry does not claim that the exact head executed in GitHub Actions."
     },
     {
       "repository": "shared-auth/shared-auth-mcp-server.rs",
       "pullRequest": 12,
       "state": "open-draft",
-      "headSha": "a2b151b7201bfa6ffefd2d009fcfeb8b2d67a8c4",
-      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "exact-diagnostic-origin"]
+      "headSha": "e539c6016ecc9eb2d5603287be4ddf90817434e8",
+      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "exact-diagnostic-origin", "runner-admission-blocked"],
+      "evidenceNote": "Permanent and test-org jobs fail before checkout with steps=null; no source-execution claim is made."
     },
     {
       "repository": "drone-mngr/drone-mngr-mcp-server.rs",
       "pullRequest": 2,
-      "state": "open-draft",
-      "headSha": "16467e46417703b405e197f5eef98a0df45c4f50",
+      "state": "merged",
+      "headSha": "8aa3e1fc40697e96b8914a0bbaa54e8b948da171",
+      "mergeSha": "7a2ec4b872fb5e560ef940b74c2b200a05aceb93",
       "safetyProfile": "physical-control",
       "mutationDefault": "disabled",
-      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "target-bound-confirmation", "exact-origin-policy", "bounded-http"]
+      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "target-bound-confirmation", "exact-origin-policy", "bounded-http", "test-org-wire"]
     },
     {
       "repository": "drone-mngr/laser-ptr-ctrl-mcp-server.rs",
       "pullRequest": 2,
-      "state": "open-draft",
-      "headSha": "14838899d62447939143ec615e97fdac3d5b563c",
+      "state": "merged",
+      "headSha": "36da493175f48aaba7350dc2227dd7acd59d199b",
+      "mergeSha": "b1e21f09144c3537f9a474d4f73b81a287e843e4",
       "safetyProfile": "physical-control",
       "mutationDefault": "disabled",
-      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "target-bound-confirmation", "exact-origin-policy", "bounded-http", "rustsec"]
+      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "target-bound-confirmation", "exact-origin-policy", "bounded-http", "rustsec", "test-org-wire"]
     }
   ]
 }
