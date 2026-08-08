@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "asOf": "2026-08-08",
+  "testRepository": "fiducia-cloud-test/mcp-contract-e2e",
+  "expectedServerCount": 10,
+  "description": "Immutable Rust MCP modularization evidence plus reusable stdio wire-contract requirements.",
+  "servers": [
+    {
+      "repository": "benefactor-cc/benefactor-cc-mcp-server.rs",
+      "pullRequest": 18,
+      "state": "merged",
+      "headSha": "b155ce1ada1f51533a9766fe276ec6e9492fd17a",
+      "mergeSha": "97088cd0cb6ba80ea10f3f865993c08a0527e73a",
+      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "shared-bootstrap"]
+    },
+    {
+      "repository": "akrion-sim/akrion-mcp-server.rs",
+      "pullRequest": 10,
+      "state": "merged",
+      "headSha": "adb93f56b03e5334fcbd6debb3ef49a2025b8fe3",
+      "mergeSha": "ebc0ba715b89a0a9ea7e822ffb34c6e69dd2192a",
+      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "bounded-http"]
+    },
+    {
+      "repository": "daedalus-fab/daedalus-fab-mcp-server.rs",
+      "pullRequest": 3,
+      "state": "merged",
+      "headSha": "41f72030013d548e3d50e91e05b39e633661085d",
+      "mergeSha": "318c55dcce2959a00e07dafa5fad7ed33fa946d2",
+      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "path-traversal"]
+    },
+    {
+      "repository": "declarative-migrations/declarative-migrations-mcp-server.rs",
+      "pullRequest": 5,
+      "state": "merged",
+      "headSha": "63547301e787e96bf888991d5e99a1bf29fc53b1",
+      "mergeSha": "aa6c5af6b6ca38767336cadfe56905bad332dd1f",
+      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "no-shell-pipeline"]
+    },
+    {
+      "repository": "fiducia-cloud/fiducia-mcp-server.rs",
+      "pullRequest": 10,
+      "state": "merged",
+      "headSha": "ffddc0fbf84d7f96e31c9e863ed75e7a7cf911b7",
+      "mergeSha": "7854ffa4a333363e4bc512801eb2e2b7ae6a5abc",
+      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "shared-bootstrap"]
+    },
+    {
+      "repository": "sonus-auris/sonus-auris-mcp-server.rs",
+      "pullRequest": 8,
+      "state": "merged",
+      "headSha": "3155c17f8a791c7afbdb6c979dfc5cb2005619de",
+      "mergeSha": "c17f3f777a8e729be49e3213754f37ed51ed869f",
+      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "bounded-http"]
+    },
+    {
+      "repository": "messaging-intel/msgint-mcp-server.rs",
+      "pullRequest": 9,
+      "state": "open-draft",
+      "headSha": "496dda201787f7bee5a0dd863841692b2ae4c9d8",
+      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "bounded-subprocess"]
+    },
+    {
+      "repository": "shared-auth/shared-auth-mcp-server.rs",
+      "pullRequest": 12,
+      "state": "open-draft",
+      "headSha": "a2b151b7201bfa6ffefd2d009fcfeb8b2d67a8c4",
+      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "exact-diagnostic-origin"]
+    },
+    {
+      "repository": "drone-mngr/drone-mngr-mcp-server.rs",
+      "pullRequest": 2,
+      "state": "open-draft",
+      "headSha": "16467e46417703b405e197f5eef98a0df45c4f50",
+      "safetyProfile": "physical-control",
+      "mutationDefault": "disabled",
+      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "target-bound-confirmation", "exact-origin-policy", "bounded-http"]
+    },
+    {
+      "repository": "drone-mngr/laser-ptr-ctrl-mcp-server.rs",
+      "pullRequest": 2,
+      "state": "open-draft",
+      "headSha": "14838899d62447939143ec615e97fdac3d5b563c",
+      "safetyProfile": "physical-control",
+      "mutationDefault": "disabled",
+      "requiredChecks": ["initialize", "tools-list", "schema", "stdio-exit", "secret-redaction", "target-bound-confirmation", "exact-origin-policy", "bounded-http", "rustsec"]
+    }
+  ]
+}

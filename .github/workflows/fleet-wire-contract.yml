@@ -1,0 +1,49 @@
+name: fleet wire contract
+
+on:
+  pull_request:
+    paths:
+      - fleet/fleet-contract.json
+      - fixtures/fake-mcp-server.mjs
+      - scripts/mcp-wire-contract.mjs
+      - scripts/test-mcp-wire-contract.mjs
+      - scripts/validate-fleet-contract.mjs
+      - .github/workflows/fleet-wire-contract.yml
+      - .github/workflows/reusable-rust-mcp-wire.yml
+  push:
+    branches: [main]
+    paths:
+      - fleet/fleet-contract.json
+      - fixtures/fake-mcp-server.mjs
+      - scripts/mcp-wire-contract.mjs
+      - scripts/test-mcp-wire-contract.mjs
+      - scripts/validate-fleet-contract.mjs
+      - .github/workflows/fleet-wire-contract.yml
+      - .github/workflows/reusable-rust-mcp-wire.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fleet-wire-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          show-progress: false
+      - name: Require supported Node runtime
+        run: node -e "const major=Number(process.versions.node.split('.')[0]); if (major < 20) process.exit(1)"
+      - name: Validate immutable ten-server inventory
+        run: node scripts/validate-fleet-contract.mjs
+      - name: Run happy-path and adversarial stdio wire tests
+        run: node --test scripts/test-mcp-wire-contract.mjs
+      - name: Syntax-check reusable workflow helper
+        run: node --check scripts/mcp-wire-contract.mjs
