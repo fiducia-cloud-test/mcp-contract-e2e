@@ -10,10 +10,11 @@ pub fn main() {
 }
 
 pub fn tty_second_sigint_forces_test() {
-  let first = server_shutdown_contract.apply(
-    server_shutdown_contract.initial(True),
-    Sigint,
-  )
+  let first =
+    server_shutdown_contract.apply(
+      server_shutdown_contract.initial(True),
+      Sigint,
+    )
   first.action
   |> should.equal(BeginGraceful)
   first.show_force_hint
@@ -27,27 +28,30 @@ pub fn tty_second_sigint_forces_test() {
 }
 
 pub fn tty_eof_only_forces_after_sigint_test() {
-  let before = server_shutdown_contract.apply(
-    server_shutdown_contract.initial(True),
-    StdinEof,
-  )
+  let before =
+    server_shutdown_contract.apply(
+      server_shutdown_contract.initial(True),
+      StdinEof,
+    )
   before.action
   |> should.equal(Ignore)
 
-  let first = server_shutdown_contract.apply(
-    server_shutdown_contract.initial(True),
-    Sigint,
-  )
+  let first =
+    server_shutdown_contract.apply(
+      server_shutdown_contract.initial(True),
+      Sigint,
+    )
   let eof = server_shutdown_contract.apply(first.state, StdinEof)
   eof.action
   |> should.equal(ForceNow)
 }
 
 pub fn non_tty_one_sigint_begins_graceful_test() {
-  let first = server_shutdown_contract.apply(
-    server_shutdown_contract.initial(False),
-    Sigint,
-  )
+  let first =
+    server_shutdown_contract.apply(
+      server_shutdown_contract.initial(False),
+      Sigint,
+    )
   first.action
   |> should.equal(BeginGraceful)
   first.show_force_hint
