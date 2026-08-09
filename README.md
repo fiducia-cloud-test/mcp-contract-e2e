@@ -18,7 +18,7 @@ Source organization: `fiducia-cloud`
 
 | Source | Commit | Branch observed |
 |---|---:|---|
-| `fiducia-cloud/fiducia-mcp-server.rs` | `77cdf2a06dfe46d8235100d5a5dce6719c78b76a` | `main` |
+| `fiducia-cloud/fiducia-mcp-server.rs` | `1b3ba4e9ffdda9e7913407834280ebcbf045048d` | `main` |
 
 ## Dependency lanes
 
@@ -29,4 +29,3 @@ Source organization: `fiducia-cloud`
 ## Running
 
 The pull-request workflow validates the generated contract without cross-organization credentials. Full integration is intentionally release-gated until required source repositories and organization read credentials are present. Run the profile-specific checks recorded in `test-plan.json` after materializing the submodule, Zed, or native-package lane.
-
