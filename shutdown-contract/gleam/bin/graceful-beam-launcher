@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# Give an OTP/Gleam service an interactive two-stage shutdown policy while
+# preserving OTP's native orderly SIGTERM application shutdown.
+set -u -o pipefail
+
+if (( $# == 0 )); then
+  printf 'usage: %s COMMAND [ARG ...]\n' "$0" >&2
+  exit 64
+fi
+
+readonly grace_ms="${SHUTDOWN_GRACE_MS:-30000}"
+if [[ ! "$grace_ms" =~ ^[1-9][0-9]*$ ]]; then
+  printf '{"level":"error","event":"shutdown_config_invalid","field":"SHUTDOWN_GRACE_MS"}\n' >&2
+  exit 64
+fi
+
+stdin_is_tty=false
+if [[ -t 0 ]]; then
+  stdin_is_tty=true
+fi
+
+phase=running
+first_trigger=
+force_trigger=
+deadline_ms=0
+child_pid=0
+term_sent=false
+signal_count=0
+
+now_ms() {
+  local value
+  value="$(date +%s%3N 2>/dev/null)" || value=
+  if [[ "$value" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "$value"
+  else
+    printf '%s000\n' "$(date +%s)"
+  fi
+}
+
+log_event() {
+  local level="$1"
+  local event="$2"
+  local trigger="$3"
+  local forced="$4"
+  local message="$5"
+  printf '{"level":"%s","event":"%s","phase":"%s","trigger":"%s","stdin_is_tty":%s,"signal_count":%s,"grace_ms":%s,"forced":%s,"message":"%s"}\n' \
+    "$level" "$event" "$phase" "$trigger" "$stdin_is_tty" "$signal_count" "$grace_ms" "$forced" "$message" >&2
+}
+
+signal_child_group() {
+  local signal="$1"
+  if (( child_pid <= 0 )); then
+    return 1
+  fi
+  kill "-$signal" -- "-$child_pid" 2>/dev/null || kill "-$signal" "$child_pid" 2>/dev/null || true
+  return 0
+}
+
+forward_pending_term() {
+  if [[ "$phase" == draining && "$term_sent" == false ]] && (( child_pid > 0 )); then
+    signal_child_group TERM || true
+    term_sent=true
+  fi
+}
+
+force_shutdown() {
+  local trigger="$1"
+  if [[ "$phase" == forcing || "$phase" == complete ]]; then
+    return
+  fi
+  phase=forcing
+  force_trigger="$trigger"
+  log_event warn shutdown_forced "$trigger" true 'forceful shutdown requested; active connections will be dropped'
+  signal_child_group KILL || true
+}
+
+request_shutdown() {
+  local trigger="$1"
+  if [[ "$trigger" == sigint || "$trigger" == sigterm ]]; then
+    signal_count=$(( signal_count + 1 ))
+  fi
+
+  if [[ "$phase" != running ]]; then
+    force_shutdown "$trigger"
+    return
+  fi
+
+  phase=draining
+  first_trigger="$trigger"
+  deadline_ms=$(( $(now_ms) + grace_ms ))
+  log_event info shutdown_requested "$trigger" false 'graceful shutdown requested; OTP application and listeners are stopping'
+  if signal_child_group TERM; then
+    term_sent=true
+  fi
+
+  if [[ "$stdin_is_tty" == true && "$trigger" == sigint ]]; then
+    log_event info shutdown_force_available "$trigger" false 'press Ctrl-C again or Ctrl-D to force shutdown'
+  fi
+}
+
+on_sigint() { request_shutdown sigint; }
+on_sigterm() { request_shutdown sigterm; }
+
+trap on_sigint INT
+trap on_sigterm TERM
+
+if command -v setsid >/dev/null 2>&1; then
+  setsid -- "$@" &
+else
+  log_event warn shutdown_launcher_degraded none false 'setsid is unavailable; terminal SIGINT isolation is degraded'
+  "$@" &
+fi
+child_pid=$!
+# A trap can run after installation but before the asynchronous child PID is
+# recorded. Replay the graceful TERM now so an early signal never degrades into
+# deadline-only SIGKILL.
+forward_pending_term
+
+while kill -0 "$child_pid" 2>/dev/null; do
+  if [[ "$phase" == draining ]]; then
+    forward_pending_term
+    if (( $(now_ms) >= deadline_ms )); then
+      force_shutdown timeout
+    elif [[ "$stdin_is_tty" == true && "$first_trigger" == sigint ]]; then
+      IFS= read -r -s -n 1 -t 0.10 _
+      read_status=$?
+      if (( read_status == 1 )); then
+        force_shutdown stdin_eof
+      fi
+    else
+      sleep 0.05
+    fi
+  else
+    sleep 0.05
+  fi
+done
+
+wait "$child_pid"
+child_status=$?
+phase=complete
+if [[ -n "$first_trigger" ]]; then
+  final_trigger="$first_trigger"
+  forced=false
+  if [[ -n "$force_trigger" ]]; then
+    final_trigger="$force_trigger"
+    forced=true
+  fi
+  log_event info shutdown_complete "$final_trigger" "$forced" 'server shutdown complete'
+fi
+exit "$child_status"
