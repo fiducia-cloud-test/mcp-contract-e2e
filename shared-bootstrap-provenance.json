@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "issue": "DEN-957",
+  "source": {
+    "repository": "fiducia-cloud/fiducia-mcp-server.rs",
+    "branch": "main",
+    "commitSha": "1b3ba4e9ffdda9e7913407834280ebcbf045048d"
+  },
+  "sharedBootstrap": {
+    "repository": "ORESoftware/mcp-rust-libs",
+    "revision": "a5c1ba9c50493ac625dd2fb175af21263d0d2801"
+  },
+  "files": {
+    "Cargo.toml": {
+      "fixture": "fixtures/Cargo.toml",
+      "blobSha": "16f31cd278a85187daed61d32cda79f46ea4a630"
+    },
+    "src/telemetry.rs": {
+      "fixture": "fixtures/src/telemetry.rs",
+      "blobSha": "d5c1a4cb11fc096332e12958d0db68a2994cb3a7"
+    },
+    "tests/shared_bootstrap_contract.rs": {
+      "fixture": "fixtures/tests/shared_bootstrap_contract.rs",
+      "blobSha": "580cc9b77b2b7aff6a8f2443084c552e3e7bbc09"
+    }
+  }
+}
