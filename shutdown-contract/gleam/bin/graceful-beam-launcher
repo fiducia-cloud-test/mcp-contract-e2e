@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Linux/Unix launcher that gives BEAM services the fleet SIGINT/TTY contract.
-# OTP itself still owns graceful application/listener shutdown after SIGTERM.
+# Give an OTP/Gleam service an interactive two-stage shutdown policy while
+# preserving OTP's native orderly SIGTERM application shutdown.
 set -u -o pipefail
 
 if (( $# == 0 )); then
@@ -24,6 +24,8 @@ first_trigger=
 force_trigger=
 deadline_ms=0
 child_pid=0
+term_sent=false
+signal_count=0
 
 now_ms() {
   local value
@@ -41,16 +43,24 @@ log_event() {
   local trigger="$3"
   local forced="$4"
   local message="$5"
-  printf '{"level":"%s","event":"%s","phase":"%s","trigger":"%s","stdin_is_tty":%s,"grace_ms":%s,"forced":%s,"message":"%s"}\n' \
-    "$level" "$event" "$phase" "$trigger" "$stdin_is_tty" "$grace_ms" "$forced" "$message" >&2
+  printf '{"level":"%s","event":"%s","phase":"%s","trigger":"%s","stdin_is_tty":%s,"signal_count":%s,"grace_ms":%s,"forced":%s,"message":"%s"}\n' \
+    "$level" "$event" "$phase" "$trigger" "$stdin_is_tty" "$signal_count" "$grace_ms" "$forced" "$message" >&2
 }
 
 signal_child_group() {
   local signal="$1"
   if (( child_pid <= 0 )); then
-    return
+    return 1
   fi
   kill "-$signal" -- "-$child_pid" 2>/dev/null || kill "-$signal" "$child_pid" 2>/dev/null || true
+  return 0
+}
+
+forward_pending_term() {
+  if [[ "$phase" == draining && "$term_sent" == false ]] && (( child_pid > 0 )); then
+    signal_child_group TERM || true
+    term_sent=true
+  fi
 }
 
 force_shutdown() {
@@ -61,11 +71,15 @@ force_shutdown() {
   phase=forcing
   force_trigger="$trigger"
   log_event warn shutdown_forced "$trigger" true 'forceful shutdown requested; active connections will be dropped'
-  signal_child_group KILL
+  signal_child_group KILL || true
 }
 
 request_shutdown() {
   local trigger="$1"
+  if [[ "$trigger" == sigint || "$trigger" == sigterm ]]; then
+    signal_count=$(( signal_count + 1 ))
+  fi
+
   if [[ "$phase" != running ]]; then
     force_shutdown "$trigger"
     return
@@ -75,20 +89,17 @@ request_shutdown() {
   first_trigger="$trigger"
   deadline_ms=$(( $(now_ms) + grace_ms ))
   log_event info shutdown_requested "$trigger" false 'graceful shutdown requested; OTP application and listeners are stopping'
-  signal_child_group TERM
+  if signal_child_group TERM; then
+    term_sent=true
+  fi
 
   if [[ "$stdin_is_tty" == true && "$trigger" == sigint ]]; then
     log_event info shutdown_force_available "$trigger" false 'press Ctrl-C again or Ctrl-D to force shutdown'
   fi
 }
 
-on_sigint() {
-  request_shutdown sigint
-}
-
-on_sigterm() {
-  request_shutdown sigterm
-}
+on_sigint() { request_shutdown sigint; }
+on_sigterm() { request_shutdown sigterm; }
 
 trap on_sigint INT
 trap on_sigterm TERM
@@ -96,15 +107,18 @@ trap on_sigterm TERM
 if command -v setsid >/dev/null 2>&1; then
   setsid -- "$@" &
 else
-  # The exact terminal policy requires a separate process group. This fallback
-  # still preserves service-manager SIGTERM behavior on systems without setsid.
   log_event warn shutdown_launcher_degraded none false 'setsid is unavailable; terminal SIGINT isolation is degraded'
   "$@" &
 fi
 child_pid=$!
+# A trap can run after installation but before the asynchronous child PID is
+# recorded. Replay the graceful TERM now so an early signal never degrades into
+# deadline-only SIGKILL.
+forward_pending_term
 
 while kill -0 "$child_pid" 2>/dev/null; do
   if [[ "$phase" == draining ]]; then
+    forward_pending_term
     if (( $(now_ms) >= deadline_ms )); then
       force_shutdown timeout
     elif [[ "$stdin_is_tty" == true && "$first_trigger" == sigint ]]; then
@@ -113,7 +127,6 @@ while kill -0 "$child_pid" 2>/dev/null; do
       if (( read_status == 1 )); then
         force_shutdown stdin_eof
       fi
-      # Bash reports a timeout as >128. Other input is deliberately ignored.
     else
       sleep 0.05
     fi

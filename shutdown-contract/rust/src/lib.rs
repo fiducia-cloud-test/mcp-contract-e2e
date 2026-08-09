@@ -52,6 +52,10 @@ impl Trigger {
             Self::GracefulComplete => "graceful_complete",
         }
     }
+
+    const fn is_signal(self) -> bool {
+        matches!(self, Self::Sigint | Self::Sigterm)
+    }
 }
 
 impl fmt::Display for Trigger {
@@ -73,6 +77,8 @@ pub struct State {
     pub phase: Phase,
     pub stdin_is_tty: bool,
     pub first_trigger: Option<Trigger>,
+    /// Counts operating-system SIGINT/SIGTERM events only.
+    pub signal_count: u32,
 }
 
 impl State {
@@ -81,6 +87,7 @@ impl State {
             phase: Phase::Running,
             stdin_is_tty,
             first_trigger: None,
+            signal_count: 0,
         }
     }
 
@@ -91,6 +98,7 @@ impl State {
                     state: Self {
                         phase: Phase::Draining,
                         first_trigger: Some(trigger),
+                        signal_count: self.signal_count.saturating_add(1),
                         ..self
                     },
                     action: Action::BeginGraceful,
@@ -110,6 +118,11 @@ impl State {
                 Trigger::Sigint | Trigger::Sigterm | Trigger::Timeout => Transition {
                     state: Self {
                         phase: Phase::Forcing,
+                        signal_count: if trigger.is_signal() {
+                            self.signal_count.saturating_add(1)
+                        } else {
+                            self.signal_count
+                        },
                         ..self
                     },
                     action: Action::Force,
@@ -171,6 +184,7 @@ impl Default for Config {
 pub struct Outcome {
     pub forced: bool,
     pub trigger: Trigger,
+    pub signal_count: u32,
 }
 
 /// Supervise a server future whose graceful-shutdown hook is controlled by
@@ -198,6 +212,7 @@ where
             return Ok(Outcome {
                 forced: false,
                 trigger: Trigger::GracefulComplete,
+                signal_count: 0,
             });
         }
         trigger = signals.recv() => trigger?,
@@ -212,6 +227,7 @@ where
         phase = state.phase.as_str(),
         trigger = first_trigger.as_str(),
         stdin_is_tty = state.stdin_is_tty,
+        signal_count = state.signal_count,
         grace_ms = config.grace_period.as_millis() as u64,
         forced = false,
         "graceful shutdown requested; listener is closing and active work is draining"
@@ -223,6 +239,7 @@ where
             phase = state.phase.as_str(),
             trigger = first_trigger.as_str(),
             stdin_is_tty = state.stdin_is_tty,
+            signal_count = state.signal_count,
             grace_ms = config.grace_period.as_millis() as u64,
             forced = false,
             "server completed before the graceful-shutdown notification was delivered"
@@ -235,10 +252,12 @@ where
             phase = state.phase.as_str(),
             trigger = first_trigger.as_str(),
             stdin_is_tty = true,
+            signal_count = state.signal_count,
             grace_ms = config.grace_period.as_millis() as u64,
             forced = false,
             "press Ctrl-C again or Ctrl-D to force shutdown"
         );
+        // Deliberately armed only after the first interactive SIGINT.
         spawn_stdin_eof_watcher()
     } else {
         None
@@ -256,6 +275,7 @@ where
                 phase = state.phase.as_str(),
                 trigger = first_trigger.as_str(),
                 stdin_is_tty = state.stdin_is_tty,
+                signal_count = state.signal_count,
                 grace_ms = config.grace_period.as_millis() as u64,
                 forced = false,
                 "graceful shutdown complete"
@@ -263,6 +283,7 @@ where
             return Ok(Outcome {
                 forced: false,
                 trigger: first_trigger,
+                signal_count: state.signal_count,
             });
         }
         trigger = signals.recv() => trigger?,
@@ -285,6 +306,7 @@ where
         phase = state.phase.as_str(),
         trigger = force_trigger.as_str(),
         stdin_is_tty = state.stdin_is_tty,
+        signal_count = state.signal_count,
         grace_ms = config.grace_period.as_millis() as u64,
         forced = true,
         "forceful shutdown requested; active connections will be dropped"
@@ -303,6 +325,7 @@ where
         phase = Phase::Complete.as_str(),
         trigger = force_trigger.as_str(),
         stdin_is_tty = state.stdin_is_tty,
+        signal_count = state.signal_count,
         grace_ms = config.grace_period.as_millis() as u64,
         forced = true,
         "forceful shutdown complete"
@@ -311,6 +334,7 @@ where
     Ok(Outcome {
         forced: true,
         trigger: force_trigger,
+        signal_count: state.signal_count,
     })
 }
 
@@ -363,9 +387,7 @@ fn spawn_stdin_eof_watcher() -> Option<tokio::sync::mpsc::UnboundedReceiver<()>>
     }
 }
 
-async fn receive_eof(
-    receiver: &mut Option<tokio::sync::mpsc::UnboundedReceiver<()>>,
-) {
+async fn receive_eof(receiver: &mut Option<tokio::sync::mpsc::UnboundedReceiver<()>>) {
     match receiver {
         Some(receiver) => match receiver.recv().await {
             Some(()) => (),
@@ -436,38 +458,54 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tty_sigint_then_sigint_forces() {
+    fn tty_sigint_then_sigint_forces_and_counts_two_signals() {
         let first = State::new(true).apply(Trigger::Sigint);
         assert_eq!(first.action, Action::BeginGraceful);
         assert!(first.show_force_hint);
+        assert_eq!(first.state.signal_count, 1);
         let second = first.state.apply(Trigger::Sigint);
         assert_eq!(second.action, Action::Force);
         assert_eq!(second.state.phase, Phase::Forcing);
+        assert_eq!(second.state.signal_count, 2);
     }
 
     #[test]
-    fn tty_eof_only_forces_after_sigint() {
+    fn tty_eof_only_forces_after_sigint_without_counting_a_signal() {
         assert_eq!(
             State::new(true).apply(Trigger::StdinEof).action,
             Action::Ignore
         );
         let first = State::new(true).apply(Trigger::Sigint);
-        assert_eq!(first.state.apply(Trigger::StdinEof).action, Action::Force);
+        let eof = first.state.apply(Trigger::StdinEof);
+        assert_eq!(eof.action, Action::Force);
+        assert_eq!(eof.state.signal_count, 1);
     }
 
     #[test]
-    fn non_tty_one_sigint_begins_graceful_without_hint() {
-        let first = State::new(false).apply(Trigger::Sigint);
-        assert_eq!(first.action, Action::BeginGraceful);
-        assert!(!first.show_force_hint);
+    fn non_tty_and_tty_sigterm_never_arm_eof() {
+        let non_tty = State::new(false).apply(Trigger::Sigint);
+        assert_eq!(non_tty.action, Action::BeginGraceful);
+        assert!(!non_tty.show_force_hint);
+        assert_eq!(
+            non_tty.state.apply(Trigger::StdinEof).action,
+            Action::Ignore
+        );
+
+        let tty_term = State::new(true).apply(Trigger::Sigterm);
+        assert_eq!(tty_term.action, Action::BeginGraceful);
+        assert!(!tty_term.show_force_hint);
+        assert_eq!(tty_term.state.signal_count, 1);
+        assert_eq!(
+            tty_term.state.apply(Trigger::StdinEof).action,
+            Action::Ignore
+        );
     }
 
     #[test]
-    fn sigterm_always_begins_graceful() {
-        for stdin_is_tty in [false, true] {
-            let first = State::new(stdin_is_tty).apply(Trigger::Sigterm);
-            assert_eq!(first.action, Action::BeginGraceful);
-            assert!(!first.show_force_hint);
-        }
+    fn timeout_forces_without_counting_a_signal() {
+        let first = State::new(false).apply(Trigger::Sigterm);
+        let timed_out = first.state.apply(Trigger::Timeout);
+        assert_eq!(timed_out.action, Action::Force);
+        assert_eq!(timed_out.state.signal_count, 1);
     }
 }

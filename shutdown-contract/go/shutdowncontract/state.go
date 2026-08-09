@@ -18,6 +18,7 @@ const (
 	SIGTERM          Trigger = "sigterm"
 	StdinEOF         Trigger = "stdin_eof"
 	Timeout          Trigger = "timeout"
+	DrainFailed      Trigger = "drain_failed"
 	GracefulComplete Trigger = "graceful_complete"
 )
 
@@ -32,11 +33,12 @@ const (
 )
 
 // State is deliberately small so every server language can implement the same
-// transition table.
+// transition table. SignalCount counts SIGINT/SIGTERM only.
 type State struct {
 	Phase        Phase
 	StdinIsTTY   bool
 	FirstTrigger Trigger
+	SignalCount  int
 }
 
 // Result is the deterministic output of Apply.
@@ -50,15 +52,20 @@ func Initial(stdinIsTTY bool) State {
 	return State{Phase: Running, StdinIsTTY: stdinIsTTY}
 }
 
+func isSignal(trigger Trigger) bool {
+	return trigger == SIGINT || trigger == SIGTERM
+}
+
 // Apply enforces the fleet shutdown contract without doing I/O.
 func Apply(state State, trigger Trigger) Result {
 	switch state.Phase {
 	case Running:
-		if trigger != SIGINT && trigger != SIGTERM {
+		if !isSignal(trigger) {
 			return Result{State: state, Action: Ignore}
 		}
 		state.Phase = Draining
 		state.FirstTrigger = trigger
+		state.SignalCount++
 		return Result{
 			State:         state,
 			Action:        BeginGraceful,
@@ -70,9 +77,11 @@ func Apply(state State, trigger Trigger) Result {
 			return Result{State: state, Action: Finish}
 		}
 		eofForces := trigger == StdinEOF && state.StdinIsTTY && state.FirstTrigger == SIGINT
-		signalForces := trigger == SIGINT || trigger == SIGTERM
-		if trigger == Timeout || eofForces || signalForces {
+		if trigger == Timeout || trigger == DrainFailed || eofForces || isSignal(trigger) {
 			state.Phase = Forcing
+			if isSignal(trigger) {
+				state.SignalCount++
+			}
 			return Result{State: state, Action: Force}
 		}
 	}
