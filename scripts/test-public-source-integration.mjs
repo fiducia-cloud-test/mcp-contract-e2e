@@ -90,7 +90,10 @@ test('rejects false certification in the generic generated lane', () => {
   const mutated = genericWorkflow
     .replace("const sourceAccessPassed = result === 'success';", "const certified = result === 'success';")
     .replace('sourceAccessPassed,\n            certified: false,', 'certified,');
-  assert.throws(() => validate({ genericWorkflow: mutated }), /source access separately|false certification logic/);
+  assert.throws(
+    () => validate({ genericWorkflow: mutated }),
+    /source access separately|must never certify product source|false certification logic/,
+  );
 });
 
 test('rejects source-pin and test-plan drift', () => {
