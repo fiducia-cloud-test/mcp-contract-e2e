@@ -1,22 +1,32 @@
-name: source pin drift
+name: source pin and certification drift
 
 on:
   pull_request:
     paths:
+      - ".github/workflows/exact-public-source-certification.yml"
+      - ".github/workflows/integration.yml"
       - ".github/workflows/source-pin-drift.yml"
       - "README.md"
+      - "scripts/strict-json.mjs"
+      - "scripts/test-public-source-integration.mjs"
       - "scripts/test-source-pin-drift.mjs"
       - "scripts/validate-plan.mjs"
+      - "scripts/validate-public-source-integration.mjs"
       - "scripts/validate-source-pin-drift.mjs"
       - "source-pins.json"
       - "test-plan.json"
   push:
     branches: [main]
     paths:
+      - ".github/workflows/exact-public-source-certification.yml"
+      - ".github/workflows/integration.yml"
       - ".github/workflows/source-pin-drift.yml"
       - "README.md"
+      - "scripts/strict-json.mjs"
+      - "scripts/test-public-source-integration.mjs"
       - "scripts/test-source-pin-drift.mjs"
       - "scripts/validate-plan.mjs"
+      - "scripts/validate-public-source-integration.mjs"
       - "scripts/validate-source-pin-drift.mjs"
       - "source-pins.json"
       - "test-plan.json"
@@ -48,28 +58,46 @@ jobs:
       - name: Resolve the public MCP source head without credentials
         id: source
         shell: bash
+        env:
+          GIT_TERMINAL_PROMPT: "0"
         run: |
           set -euo pipefail
-          remote_sha="$(git ls-remote https://github.com/fiducia-cloud/fiducia-mcp-server.rs.git refs/heads/main | cut -f1)"
+          mapfile -t refs < <(
+            timeout 20s git ls-remote \
+              https://github.com/fiducia-cloud/fiducia-mcp-server.rs.git \
+              refs/heads/main
+          )
+          test "${#refs[@]}" -eq 1
+          read -r remote_sha remote_ref <<< "${refs[0]}"
           [[ "${remote_sha}" =~ ^[0-9a-f]{40}$ ]]
+          test "${remote_ref}" = "refs/heads/main"
           echo "sha=${remote_sha}" >> "${GITHUB_OUTPUT}"
 
-      - name: Run hostile source-pin mutations
+      - name: Run hostile source-pin and workflow mutations
         env:
           MCP_REMOTE_SHA: ${{ steps.source.outputs.sha }}
-        run: node --test scripts/test-source-pin-drift.mjs
+        run: |
+          set -euo pipefail
+          node --test scripts/test-source-pin-drift.mjs
+          node --test scripts/test-public-source-integration.mjs
 
-      - name: Verify all source-pin documents against current main
+      - name: Verify source-pin documents and workflow policy
         env:
           MCP_REMOTE_SHA: ${{ steps.source.outputs.sha }}
           SOURCE_PIN_EVIDENCE: test-results/source-pin-drift-evidence.json
-        run: node scripts/validate-source-pin-drift.mjs .
+          PUBLIC_SOURCE_WORKFLOW_EVIDENCE: test-results/public-source-workflow-evidence.json
+        run: |
+          set -euo pipefail
+          node scripts/validate-source-pin-drift.mjs .
+          node scripts/validate-public-source-integration.mjs .
 
-      - name: Upload metadata-only pin evidence
+      - name: Upload metadata-only drift evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: fiducia-mcp-source-pin-${{ github.run_id }}-${{ github.run_attempt }}
-          path: test-results/source-pin-drift-evidence.json
+          name: fiducia-mcp-source-policy-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test-results/source-pin-drift-evidence.json
+            test-results/public-source-workflow-evidence.json
           if-no-files-found: error
           retention-days: 14

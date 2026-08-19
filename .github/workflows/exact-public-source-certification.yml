@@ -1,0 +1,134 @@
+name: exact public source certification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/exact-public-source-certification.yml"
+      - "README.md"
+      - "scripts/test-public-source-integration.mjs"
+      - "scripts/validate-public-source-integration.mjs"
+      - "source-pins.json"
+      - "test-plan.json"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/exact-public-source-certification.yml"
+      - "README.md"
+      - "scripts/test-public-source-integration.mjs"
+      - "scripts/validate-public-source-integration.mjs"
+      - "source-pins.json"
+      - "test-plan.json"
+  workflow_dispatch:
+  schedule:
+    - cron: '11 8 * * 3'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out the test harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: harness
+          show-progress: false
+          submodules: false
+
+      - name: Check out the exact public Fiducia MCP source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: fiducia-cloud/fiducia-mcp-server.rs
+          ref: 1b3ba4e9ffdda9e7913407834280ebcbf045048d
+          path: fiducia-mcp-server.rs
+          persist-credentials: false
+          show-progress: false
+          submodules: false
+
+      - name: Check out the exact public Rust client dependency
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: fiducia-cloud/fiducia-clients
+          ref: 5cd1a537f7ab98808ece4cdd09723be0bf49ce8b
+          path: fiducia-clients
+          persist-credentials: false
+          show-progress: false
+          submodules: false
+
+      - name: Verify exact source identities and harness contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C fiducia-mcp-server.rs rev-parse HEAD)" = "1b3ba4e9ffdda9e7913407834280ebcbf045048d"
+          test "$(git -C fiducia-clients rev-parse HEAD)" = "5cd1a537f7ab98808ece4cdd09723be0bf49ce8b"
+          node harness/scripts/validate-plan.mjs
+          node harness/scripts/validate-public-source-integration.mjs harness
+
+      - uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
+        with:
+          toolchain: "1.97.0"
+          components: rustfmt, clippy
+
+      - name: Execute the pinned Fiducia MCP source contract
+        working-directory: fiducia-mcp-server.rs
+        env:
+          RUSTDOCFLAGS: -D warnings
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f Cargo.lock
+          cargo fmt --all -- --check
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo build --release --locked
+          cargo test --locked --all-targets
+          cargo doc --locked --no-deps
+
+  certification-status:
+    name: Record exact public source certification status
+    if: always()
+    needs: integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Write source-integration status
+        env:
+          RESULT: ${{ needs.integration.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const result = process.env.RESULT || 'unknown';
+          const executed = result !== 'skipped';
+          const certified = result === 'success';
+          const report = {
+            schemaVersion: 2,
+            sourceRepository: 'fiducia-cloud/fiducia-mcp-server.rs',
+            sourceSha: '1b3ba4e9ffdda9e7913407834280ebcbf045048d',
+            dependencyRepository: 'fiducia-cloud/fiducia-clients',
+            dependencySha: '5cd1a537f7ab98808ece4cdd09723be0bf49ce8b',
+            executed,
+            certified,
+            result,
+            reason: certified ? 'exact-public-source-integration-passed'
+              : executed ? 'exact-public-source-integration-did-not-pass'
+                : 'exact-public-source-integration-not-executed',
+          };
+          fs.writeFileSync('source-integration-status.json', `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+          console.log(JSON.stringify(report));
+          NODE
+
+      - name: Upload source-integration status
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: fiducia-public-source-integration-${{ github.run_id }}-${{ github.run_attempt }}
+          path: source-integration-status.json
+          if-no-files-found: error
+          retention-days: 14

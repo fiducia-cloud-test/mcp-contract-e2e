@@ -28,4 +28,4 @@ Source organization: `fiducia-cloud`
 
 ## Running
 
-The pull-request workflow validates the generated contract without cross-organization credentials. Full integration is intentionally release-gated until required source repositories and organization read credentials are present. Run the profile-specific checks recorded in `test-plan.json` after materializing the submodule, Zed, or native-package lane.
+The pull-request workflow validates the generated contract without cross-organization credentials. The generator-owned gated integration reports protected source-access status only and never certifies product source. The product-owned `exact-public-source-certification.yml` workflow checks out the exact public MCP server and Rust client dependency, verifies their commit identities, and runs the locked Rust format, Clippy, release build, test, and documentation contract. Only that successful executable lane may report `certified: true`.
