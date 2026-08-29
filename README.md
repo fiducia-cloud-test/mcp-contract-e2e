@@ -18,7 +18,7 @@ Source organization: `fiducia-cloud`
 
 | Source | Commit | Branch observed |
 |---|---:|---|
-| `fiducia-cloud/fiducia-mcp-server.rs` | `1b3ba4e9ffdda9e7913407834280ebcbf045048d` | `main` |
+| `fiducia-cloud/fiducia-mcp-server.rs` | `45b0ce945ce245911d45ec5323f7931879a90a66` | `main` |
 
 ## Dependency lanes
 
@@ -28,4 +28,5 @@ Source organization: `fiducia-cloud`
 
 ## Running
 
-The pull-request workflow validates the generated contract without cross-organization credentials. The generator-owned gated integration reports protected source-access status only and never certifies product source. The product-owned `exact-public-source-certification.yml` workflow checks out the exact public MCP server and Rust client dependency, verifies their commit identities, and runs the locked Rust format, Clippy, release build, test, and documentation contract. Only that successful executable lane may report `certified: true`.
+The pull-request workflow validates the generated contract without cross-organization credentials. Product-specific files outside the generated file set are preserved and must add executable assertions without weakening the base contract. Full integration is intentionally release-gated until required source repositories and organization read credentials are present. The generic protected lane reports source-access status only; source certification requires a product-specific executable overlay. A skipped integration job is not source certification. Run the profile-specific checks recorded in `test-plan.json` after materializing the submodule, Zed, or native-package lane.
+
