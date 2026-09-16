@@ -1,4 +1,4 @@
-use ores_api_docs::{contract_sha256, RouteMap};
+use ores_api_docs::{RouteMap, contract_sha256};
 
 fn main() {
     formatting_and_key_order_do_not_change_identity();
@@ -89,5 +89,8 @@ fn duplicate_http_binding_fails_closed() {
     )
     .expect_err("duplicate HTTP method/path binding must fail closed");
     let message = error.to_string();
-    assert!(message.contains("both bind GET /dup"), "unexpected error: {message}");
+    assert!(
+        message.contains("both bind GET /dup"),
+        "unexpected error: {message}"
+    );
 }
