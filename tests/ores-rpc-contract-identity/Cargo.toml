@@ -1,0 +1,9 @@
+[package]
+name = "ores-rpc-contract-identity-cert"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+
+[dependencies]
+ores-api-docs = { git = "https://github.com/ORESoftware/api-docs.git", rev = "ada7ad60258638da1002ca7e823d900aaa838392", package = "ores-api-docs", default-features = false }
