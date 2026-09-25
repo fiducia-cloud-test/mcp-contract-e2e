@@ -1,0 +1,31 @@
+name: Certify canonical-retool PR 34
+
+on:
+  pull_request:
+    paths:
+      - 'certifications/canonical-retool-pr34/**'
+      - '.github/workflows/certify-canonical-retool-pr34.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-head:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Parse source pin
+        run: node -e 'const m=require("./certifications/canonical-retool-pr34/source.json"); if(m.source_head!=="bf33341197795658be2b76eaa4ec44143fb98a71") process.exit(1)'
+      - name: Syntax check exact source snapshots
+        run: |
+          node --check certifications/canonical-retool-pr34/source/retool-mcp-client.mjs
+          node --check certifications/canonical-retool-pr34/source/retool-mcp-bridge.mjs
+      - name: Run exact-head MCP transport and safety tests
+        run: node --test certifications/canonical-retool-pr34/test.mjs
