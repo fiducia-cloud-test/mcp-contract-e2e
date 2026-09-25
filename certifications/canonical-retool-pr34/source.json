@@ -1,0 +1,11 @@
+{
+  "schema": "canonical.cross-org-cert/v1",
+  "source_repo": "canonical-cloud/canonical-retool",
+  "source_pr": 34,
+  "source_head": "bf33341197795658be2b76eaa4ec44143fb98a71",
+  "files": {
+    "docs/retool-mcp-client.md": "d1438a11a8df3eadc2ce80de2de9cbf8d1f63eaf",
+    "tools/retool-mcp-bridge.mjs": "054b49377a511b4cfb37a3f101651137ad23504c",
+    "tools/retool-mcp-client.mjs": "22b5998ee8c5abb178b491f88b3f09480bf9d8da"
+  }
+}
